@@ -1,6 +1,6 @@
-# Packages QuickType into an .opk (a ZIP of the app files with
-# manifest.json at the archive root, extension renamed to .opk).
-# README.md stays out of the package: it is repo documentation, not an app file.
+# Packages QuickType into an unpacked distribution ZIP archive.
+# Users extract this ZIP and load the resulting folder in Overwolf
+# via "Load unpacked extension".
 $ErrorActionPreference = 'Stop'
 
 $rootDir = Split-Path $PSScriptRoot -Parent
@@ -10,7 +10,7 @@ New-Item -ItemType Directory -Force -Path $dist | Out-Null
 
 $manifest = Get-Content -Raw (Join-Path $src 'manifest.json') | ConvertFrom-Json
 $appId = ($manifest.meta.name -replace '[^A-Za-z0-9]+', '-')
-$opkName = '{0}-{1}.opk' -f $appId, $manifest.meta.version
+$zipName = '{0}-{1}.zip' -f $appId, $manifest.meta.version
 
 $files = @(
     'manifest.json',
@@ -33,18 +33,16 @@ foreach ($f in $files) {
 
 $stage = Join-Path $dist 'stage'
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
-New-Item -ItemType Directory -Force -Path $stage | Out-Null
+$stageApp = Join-Path $stage 'quicktype-overlay'
+New-Item -ItemType Directory -Force -Path $stageApp | Out-Null
+
 foreach ($f in $files) {
-    Copy-Item (Join-Path $src $f) (Join-Path $stage $f)
+    Copy-Item (Join-Path $src $f) (Join-Path $stageApp $f)
 }
 
-$zip = Join-Path $dist ($opkName -replace '\.opk$', '.zip')
+$zip = Join-Path $dist $zipName
 if (Test-Path $zip) { Remove-Item -Force $zip }
-Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip
-
-$opk = Join-Path $dist $opkName
-if (Test-Path $opk) { Remove-Item -Force $opk }
-Move-Item $zip $opk
+Compress-Archive -Path $stageApp -DestinationPath $zip
 Remove-Item -Recurse -Force $stage
 
-'{0} bytes -> {1}' -f (Get-Item $opk).Length, $opk
+'{0} bytes -> {1}' -f (Get-Item $zip).Length, $zip

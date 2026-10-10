@@ -5,6 +5,6 @@
 ## Структура репозитория
 
 - `quicktype-overlay/` — исходный код Overwolf-приложения (манифест, HTML/JS/CSS).
-- `scripts/` — служебные скрипты сборки и вспомогательные утилиты (`package-opk.ps1`, `patch-overwolf-gamelist.js`).
+- `scripts/` — служебные скрипты сборки и вспомогательные утилиты (`package-app.ps1`, `patch-overwolf-gamelist.js`).
 - `docs/` — документация проекта.
-- `dist/` — скомпилированные / упакованные OPK-пакеты (в gitignore).
+- `dist/` — упакованные релизные ZIP-архивы (в gitignore).

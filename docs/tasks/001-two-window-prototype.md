@@ -22,12 +22,12 @@ related_roadmap: ["ROADMAP-001"]
    - Управление окнами (`restore`, `bringToFront`, `requestOverlayFocus`, `minimize`);
    - Выполнение асинхронных HTTP-запросов к настроенному REST API;
    - Обновление размеров окна оверлея через `overwolf.windows.changeSize`.
-4. Обновление `manifest.json` и скрипта сборки `scripts/package-opk.ps1` (`QuickType-0.2.3.opk`).
+4. Обновление `manifest.json` и скрипта сборки `scripts/package-app.ps1` (`QuickType-0.2.3.zip`).
 5. Инициализация Git-репозитория и создание базового `.gitignore`.
 
 ## Результат
 
 Прототип полностью реализован и протестирован:
 - Рабочая двухоконная модель в директории `quicktype-overlay/`.
-- Корректная сборка пакета `dist/QuickType-0.2.3.opk`.
+- Корректная сборка архива `dist/QuickType-0.2.3.zip`.
 - Подтверждена обработка `Escape` и `Enter`.

@@ -64,35 +64,35 @@ jobs:
           }
           Write-Host "All PowerShell scripts passed AST validation."
 
-  build-opk:
-    name: Test OPK Package Build
+  build-package:
+    name: Test Distribution ZIP Build
     needs: validate
     runs-on: windows-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Build OPK Package
+      - name: Build Distribution ZIP
         run: |
-          .\scripts\package-opk.ps1
+          .\scripts\package-app.ps1
 
-      - name: Verify OPK Archive Integrity
+      - name: Verify ZIP Archive Integrity
         run: |
-          $opk = Get-ChildItem -Path dist -Filter "*.opk" | Select-Object -First 1
-          if (-not $opk) { throw "No OPK package was generated in dist/" }
-          if ($opk.Length -lt 5000) { throw "OPK file size is unexpectedly small: $($opk.Length) bytes" }
+          $zipPath = Get-ChildItem -Path dist -Filter "*.zip" | Select-Object -First 1
+          if (-not $zipPath) { throw "No ZIP package was generated in dist/" }
+          if ($zipPath.Length -lt 5000) { throw "ZIP file size is unexpectedly small: $($zipPath.Length) bytes" }
           
-          # Verify ZIP integrity and root manifest.json
+          # Verify ZIP integrity and app folder
           Add-Type -AssemblyName System.IO.Compression.FileSystem
-          $zip = [System.IO.Compression.ZipFile]::OpenRead($opk.FullName)
-          $manifestEntry = $zip.GetEntry("manifest.json")
-          if (-not $manifestEntry) { throw "manifest.json missing at root of OPK package" }
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($zipPath.FullName)
+          $manifestEntry = $zip.Entries | Where-Object { $_.FullName -like "*manifest.json" }
+          if (-not $manifestEntry) { throw "manifest.json missing inside ZIP package" }
           $zip.Dispose()
-          Write-Host "OPK package verified successfully: $($opk.Name) ($($opk.Length) bytes)"
+          Write-Host "ZIP package verified successfully: $($zipPath.Name) ($($zipPath.Length) bytes)"
 
-      - name: Upload OPK Artifact
+      - name: Upload Package Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: QuickType-OPK
-          path: dist/*.opk
+          name: QuickType-Release-ZIP
+          path: dist/*.zip
           retention-days: 14

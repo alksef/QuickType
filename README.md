@@ -31,27 +31,23 @@
   - `docs/tasks/` — Задачи разработки ([TASK-001](./docs/tasks/001-two-window-prototype.md)).
   - `docs/research/` — Технический ресерч ядра Overwolf, MixMode и DirectX-хуков.
 - `scripts/` — служебные скрипты и утилиты:
-  - `scripts/package-opk.ps1` — автоматическая сборка приложения в `.opk` архив для Overwolf (`dist/QuickType-0.2.3.opk`).
+  - `scripts/package-app.ps1` — автоматическая сборка релизного архива (`dist/QuickType-0.2.3.zip`).
   - `scripts/patch-overwolf-gamelist.js` — утилита исправления `GamesList.xml` для игр без видимого курсора.
   - `scripts/gen-icon.ps1` — скрипт генерации PNG-иконки приложения.
-- `dist/` — собранные релизные пакеты `.opk` (в `.gitignore`).
+- `dist/` — собранные релизные пакеты `.zip` (в `.gitignore`).
 
 ## Быстрый старт
 
-### 1. Загрузка в Overwolf (Unpacked)
-1. Откройте клиент Overwolf.
-2. Включите режим разработчика: `Настройки` -> `О программе` (About) -> кликните 10 раз по номеру версии или зайдите в аккаунт с правами разработчика.
-3. Перейдите в `Пакетирование` (Packages / Development Options) -> **Load unpacked extension**.
-4. Выберите папку `quicktype-overlay`.
-5. Приложение запустится, и откроется главное окно настроек QuickType.
+### 1. Установка из релиза (ZIP)
+1. Скачайте `QuickType-0.2.3.zip` со страницы [Releases](https://github.com/alksef/QuickType/releases) и распакуйте архив.
+2. В клиенте Overwolf откройте режим разработчика: `Настройки` -> `О программе` (About) -> кликните 10 раз по номеру версии (или войдите в аккаунт с правами разработчика).
+3. Перейдите в `Пакетирование` (Packages) / `Development Options` -> нажмите **Load unpacked extension**.
+4. Выберите распакованную папку `quicktype-overlay`.
+5. Приложение запустится и появится в доке Overwolf.
 
-### 2. Сборка OPK для релиза
+### 2. Сборка из исходников
 Запустите PowerShell скрипт в корне репозитория:
 ```powershell
-.\scripts\package-opk.ps1
+.\scripts\package-app.ps1
 ```
-Готовый пакет будет помещён в `dist/QuickType-0.2.3.opk`.
-
-> **Примечание об установке `.opk`:**
-> Пакеты `.opk` предназначены для дистрибуции через Overwolf App Store. Локальные (неподписанные магазином Overwolf) `.opk` файлы при двойном клике отклоняются клиентом Overwolf с сообщением *"This is an unverified version of the app"* из-за отсутствия серверной подписи `_metadata/verified_contents.json`.
-> Для локального запуска и разработки используйте **Load unpacked extension** (выбрав папку `quicktype-overlay`). Подписанный пакет становится доступен после прохождения ревью в [Overwolf Developer Console](https://dev.overwolf.com/).
+Готовый дистрибутив будет собран в `dist/QuickType-0.2.3.zip`.

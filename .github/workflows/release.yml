@@ -27,9 +27,9 @@ jobs:
           Write-Host "Tag version matches manifest: $tagVersion"
           "VERSION=$tagVersion" >> $env:GITHUB_ENV
 
-      - name: Build OPK Package
+      - name: Build Distribution Package
         run: |
-          .\scripts\package-opk.ps1
+          .\scripts\package-app.ps1
 
       - name: Extract Release Notes from CHANGELOG
         id: extract-notes
@@ -47,7 +47,7 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.opk
+          files: dist/*.zip
           name: QuickType ${{ github.ref_name }}
           body_path: release-notes.md
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || startsWith(github.ref_name, 'v0.') }}
