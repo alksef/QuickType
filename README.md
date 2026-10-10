@@ -51,3 +51,7 @@
 .\scripts\package-opk.ps1
 ```
 Готовый пакет будет помещён в `dist/QuickType-0.2.3.opk`.
+
+> **Примечание об установке `.opk`:**
+> Пакеты `.opk` предназначены для дистрибуции через Overwolf App Store. Локальные (неподписанные магазином Overwolf) `.opk` файлы при двойном клике отклоняются клиентом Overwolf с сообщением *"This is an unverified version of the app"* из-за отсутствия серверной подписи `_metadata/verified_contents.json`.
+> Для локального запуска и разработки используйте **Load unpacked extension** (выбрав папку `quicktype-overlay`). Подписанный пакет становится доступен после прохождения ревью в [Overwolf Developer Console](https://dev.overwolf.com/).

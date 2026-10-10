@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build & Publish Release
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Validate Tag Matches Manifest Version
+        id: check-version
+        run: |
+          $tagVersion = "${{ github.ref_name }}" -replace '^v', ''
+          $manifest = Get-Content -Raw "quicktype-overlay/manifest.json" | ConvertFrom-Json
+          if ($manifest.meta.version -ne $tagVersion) {
+              throw "Version mismatch! Tag is '$tagVersion' but manifest.json has '$($manifest.meta.version)'"
+          }
+          Write-Host "Tag version matches manifest: $tagVersion"
+          "VERSION=$tagVersion" >> $env:GITHUB_ENV
+
+      - name: Build OPK Package
+        run: |
+          .\scripts\package-opk.ps1
+
+      - name: Extract Release Notes from CHANGELOG
+        id: extract-notes
+        run: |
+          $ver = "${{ env.VERSION }}"
+          $changelog = Get-Content -Raw "CHANGELOG.md"
+          $pattern = "(?s)## \[$ver\][^\r\n]*\r?\n(.*?)(?=\r?\n## \[|\Z)"
+          if ($changelog -match $pattern) {
+              $notes = $matches[1].Trim()
+              Set-Content -Path "release-notes.md" -Value $notes -Encoding UTF8
+          } else {
+              Set-Content -Path "release-notes.md" -Value "QuickType release $ver" -Encoding UTF8
+          }
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.opk
+          name: QuickType ${{ github.ref_name }}
+          body_path: release-notes.md
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || startsWith(github.ref_name, 'v0.') }}
+          generate_release_notes: true
