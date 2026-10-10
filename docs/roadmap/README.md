@@ -24,11 +24,11 @@ related_tasks: ["TASK-001"]
 
 ## Активные направления
 
-- [ROADMAP-001: Универсальный REST Overlay для Overwolf App Store](./active/001-universal-rest-overlay.md) — `in_progress`
+*(Нет)*
 
 ## Завершённые направления
 
-*(Будут зафиксированы по завершении этапов)*
+- [ROADMAP-001: Универсальный REST Overlay для Overwolf App Store](./completed/001-universal-rest-overlay.md) — `completed` (релиз 0.3.0)
 
 ## Отклонённые направления
 
