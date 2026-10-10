@@ -1,0 +1,83 @@
+{
+  "manifest_version": 1,
+  "type": "WebApp",
+  "meta": {
+    "name": "QuickType",
+    "author": "QuickType",
+    "version": "0.2.3",
+    "minimum-overwolf-version": "0.188.0",
+    "description": "Universal in-game quick input overlay with REST API & webhook integration.",
+    "dock_button_title": "QuickType",
+    "icon": "icon.png",
+    "launcher_icon": "icon.png",
+    "window_icon": "icon.png"
+  },
+  "permissions": [
+    "Hotkeys",
+    "GameInfo",
+    "FileSystem",
+    "Web"
+  ],
+  "data": {
+    "start_window": "background",
+    "game_targeting": {
+      "type": "all"
+    },
+    "hotkeys": {
+      "toggle_input_form": {
+        "title": "Показать/скрыть оверлей ввода QuickType",
+        "action-type": "custom",
+        "default": "Ctrl+Shift+F9",
+        "passthrough": false
+      }
+    },
+    "windows": {
+      "background": {
+        "file": "background.html",
+        "is_background_page": true
+      },
+      "desktop": {
+        "file": "desktop.html",
+        "native_window": true,
+        "resizable": false,
+        "transparent": false,
+        "show_in_taskbar": true,
+        "size": {
+          "width": 600,
+          "height": 800
+        },
+        "min_size": {
+          "width": 600,
+          "height": 800
+        },
+        "max_size": {
+          "width": 600,
+          "height": 800
+        }
+      },
+      "overlay": {
+        "file": "overlay.html",
+        "transparent": true,
+        "resizable": false,
+        "show_in_taskbar": false,
+        "in_game_only": true,
+        "grab_keyboard_focus": true,
+        "focus_game_takeover": "ReleaseOnHidden",
+        "focus_game_takeover_release_hotkey": "toggle_input_form",
+        "size": {
+          "width": 640,
+          "height": 180
+        },
+        "min_size": {
+          "width": 300,
+          "height": 80
+        }
+      }
+    },
+    "developer": {
+      "enable_auto_refresh": true,
+      "reload_delay": 1000,
+      "filter": "*.*"
+    }
+  }
+}

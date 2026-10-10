@@ -1,0 +1,23 @@
+# Overwolf build outputs & packages
+/dist/
+*.opk
+*.zip
+
+# Research scratch, logs & diagnostics
+/.work/
+*.log
+overwolf-focus-log.txt
+
+# Local research & diagnostics (kept locally, excluded from public repo)
+/research/
+
+# Node / Dependencies
+node_modules/
+package-lock.json
+
+# System & IDE
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+.DS_Store

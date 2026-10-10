@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>QuickType Background Controller</title>
+</head>
+<body>
+<script src="config.js"></script>
+<script>
+  var HOTKEY_NAME = 'toggle_input_form';
+  var OVERLAY_WINDOW = 'overlay';
+  var DESKTOP_WINDOW = 'desktop';
+
+  var switching = false;
+  var currentConfig = loadOverlayConfig();
+
+  console.log('[QuickType] Controller initialized v0.2.1');
+
+  if (typeof overwolf !== 'undefined') {
+    // 1. Обработка клика по иконке в доке Overwolf или запуска приложения
+    overwolf.extensions.onAppLaunchTriggered.addListener(function (event) {
+      console.log('[QuickType] onAppLaunchTriggered:', event);
+      openDesktopWindow();
+    });
+
+    // При первичном запуске фонового скрипта сразу открываем десктопное окно настроек
+    openDesktopWindow();
+
+    // 2. Хоткей вызова внутриигрового оверлея
+    overwolf.settings.hotkeys.onPressed.addListener(function (event) {
+      if (event.name !== HOTKEY_NAME) return;
+      if (switching) return;
+      switching = true;
+
+      overwolf.windows.getWindowState(OVERLAY_WINDOW, function (result) {
+        if (!result.success) {
+          switching = false;
+          console.error('[QuickType] getWindowState error:', result.error);
+          return;
+        }
+
+        var isOpen = result.window_state_ex === 'normal' || result.window_state_ex === 'maximized';
+        if (isOpen) {
+          hideOverlay();
+        } else {
+          showOverlay();
+        }
+      });
+    });
+
+    // 3. Обработка сообщений между окнами
+    overwolf.windows.onMessageReceived.addListener(function (message) {
+      if (message.id === 'hide_overlay') {
+        if (switching) return;
+        switching = true;
+        hideOverlay();
+      } else if (message.id === 'config_updated') {
+        currentConfig = loadOverlayConfig();
+        applyConfigToOverlay();
+      } else if (message.id === 'submit_text') {
+        handleSubmitText(message.content ? message.content.text : '');
+      }
+    });
+  }
+
+  function openDesktopWindow() {
+    overwolf.windows.obtainDeclaredWindow(DESKTOP_WINDOW, function (res) {
+      if (res.success) {
+        overwolf.windows.restore(res.window.id, function () {
+          overwolf.windows.bringToFront(res.window.id, true, function () {});
+        });
+      }
+    });
+  }
+
+  function withOverlayWindow(callback) {
+    overwolf.windows.obtainDeclaredWindow(OVERLAY_WINDOW, function (result) {
+      if (!result.success) {
+        switching = false;
+        console.error('[QuickType] obtainDeclaredWindow error:', result.error);
+        return;
+      }
+      callback(result.window.id);
+    });
+  }
+
+  function applyConfigToOverlay() {
+    withOverlayWindow(function (id) {
+      var w = currentConfig.overlayWidth || 640;
+      var h = currentConfig.overlayHeight || 180;
+      overwolf.windows.changeSize(id, w, h, function (res) {
+        console.log('[QuickType] changeSize result:', res);
+      });
+      overwolf.windows.sendMessage(id, 'config_updated', currentConfig, function () {});
+    });
+  }
+
+  function focusInputField(id) {
+    overwolf.windows.sendMessage(id, 'focus_input_field', {}, function () {});
+    setTimeout(function () {
+      overwolf.windows.sendMessage(id, 'focus_input_field', {}, function () {});
+    }, 40);
+  }
+
+  function showOverlay() {
+    withOverlayWindow(function (id) {
+      // Восстанавливаем окно без блокирующих промежуточных вызовов
+      overwolf.windows.restore(id, function (restoreResult) {
+        if (!restoreResult.success) {
+          switching = false;
+          console.error('[QuickType] restore error:', restoreResult.error);
+          return;
+        }
+
+        // Вызов bringToFront для перевода окна на передний план
+        if (typeof overwolf.windows.bringToFront === 'function') {
+          overwolf.windows.bringToFront(id, true, function () {});
+        }
+
+        // Запрос эксклюзивного фокуса
+        if (typeof overwolf.windows.requestOverlayFocus === 'function') {
+          overwolf.windows.requestOverlayFocus(id, function (focusResult) {
+            switching = false;
+            focusInputField(id);
+          });
+        } else {
+          switching = false;
+          focusInputField(id);
+        }
+      });
+    });
+  }
+
+  function hideOverlay() {
+    withOverlayWindow(function (id) {
+      overwolf.windows.minimize(id, function (result) {
+        switching = false;
+      });
+    });
+  }
+
+  // Асинхронное выполнение REST API запроса
+  function handleSubmitText(text) {
+    if (!text) return;
+    console.log('[QuickType] Отправка REST запроса для текста:', text);
+
+    executeRestRequest(currentConfig, text)
+      .then(function (result) {
+        if (!result.ok) {
+          throw new Error(result.error || ('HTTP ' + result.status));
+        }
+        console.log('[QuickType] REST запрос выполнен успешно:', result.status, result.durationMs + 'ms');
+        withOverlayWindow(function (id) {
+          overwolf.windows.sendMessage(id, 'rest_result', { ok: true, status: result.status }, function () {});
+        });
+      })
+      .catch(function (error) {
+        console.error('[QuickType] Ошибка REST запроса:', error.message);
+        withOverlayWindow(function (id) {
+          overwolf.windows.sendMessage(id, 'rest_result', { ok: false, error: error.message }, function () {});
+        });
+      });
+  }
+</script>
+</body>
+</html>

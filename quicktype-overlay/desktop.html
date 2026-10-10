@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>QuickType — Настройки</title>
+  <link rel="stylesheet" href="desktop.css">
+</head>
+<body>
+  <div class="main-container">
+    <!-- Верхний лаконичный заголовок приложения (без дублирования кнопок окна) -->
+    <header class="app-hero">
+      <div class="brand-badge">
+        <svg class="brand-icon" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M4 3h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-4l-4 4-4-4H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm1 2v10h4l3 3 3-3h4V5H5z"/>
+        </svg>
+      </div>
+      <div class="hero-text">
+        <h1 class="hero-title">QuickType</h1>
+        <p class="hero-subtitle">Конфигурация внутриигрового оверлея</p>
+      </div>
+    </header>
+
+    <!-- Сплошная монолитная панель настроек -->
+    <main class="settings-panel">
+
+      <!-- СЕКЦИЯ 1: Параметры REST API -->
+      <section class="settings-section">
+        <div class="section-header">
+          <span class="header-indicator purple"></span>
+          <h2 class="section-title">Параметры REST API</h2>
+        </div>
+
+        <div class="form-group">
+          <label for="apiUrl">Эндпоинт (URL)</label>
+          <input type="text" id="apiUrl" class="form-input" placeholder="http://127.0.0.1:10101/v1/speech" spellcheck="false">
+          <span class="field-hint">Адрес, на который отправляется введённый текст</span>
+        </div>
+
+        <div class="form-group">
+          <label for="httpMethod">HTTP Метод</label>
+          <div class="select-wrapper">
+            <select id="httpMethod" class="form-select">
+              <option value="POST">POST</option>
+              <option value="GET">GET</option>
+              <option value="PUT">PUT</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="headers">HTTP Заголовки (JSON)</label>
+          <textarea id="headers" class="form-textarea code-font" rows="3" spellcheck="false"></textarea>
+          <span class="field-hint">JSON-объект заголовков (например, <code>Authorization</code>, <code>Content-Type</code>)</span>
+        </div>
+
+        <div class="form-group">
+          <label for="payloadTemplate">Шаблон тела запроса (Payload)</label>
+          <textarea id="payloadTemplate" class="form-textarea code-font" rows="3" spellcheck="false"></textarea>
+          <span class="field-hint">Плейсхолдер <code>{text}</code> заменится на текст из оверлея</span>
+        </div>
+      </section>
+
+      <hr class="section-divider">
+
+      <!-- СЕКЦИЯ 2: Тест отправки (блок перед окном оверлея) -->
+      <section class="settings-section">
+        <div class="section-header">
+          <span class="header-indicator purple"></span>
+          <h2 class="section-title">Тест отправки</h2>
+        </div>
+
+        <div class="test-row">
+          <input type="text" id="testInput" class="form-input test-field" value="Тестовая фраза для озвучки" spellcheck="false" placeholder="Текст для проверки...">
+          <button id="btn-test-request" class="btn btn-action" type="button">Отправить</button>
+        </div>
+
+        <div class="test-status-line">
+          <span id="resultBadge" class="badge">Готов к тесту</span>
+          <span id="resultStatusText" class="status-detail"></span>
+        </div>
+
+        <div id="testResultBox" class="test-result-box" style="display: none;">
+          <div class="result-box-header">
+            <span id="resultBoxTitle" class="result-box-title">Результат</span>
+            <span id="resultBoxMeta" class="result-box-meta"></span>
+          </div>
+          <pre id="resultBoxBody" class="result-box-body code-font"></pre>
+        </div>
+      </section>
+
+      <hr class="section-divider">
+
+      <!-- СЕКЦИЯ 3: Окно оверлея -->
+      <section class="settings-section">
+        <div class="section-header">
+          <span class="header-indicator cyan"></span>
+          <h2 class="section-title">Окно оверлея</h2>
+        </div>
+
+        <div class="size-grid">
+          <div class="form-group">
+            <label for="overlayWidth">Ширина (px)</label>
+            <input type="number" id="overlayWidth" class="form-input" min="300" max="1920" step="20">
+          </div>
+          <div class="form-group">
+            <label for="overlayHeight">Высота (px)</label>
+            <input type="number" id="overlayHeight" class="form-input" min="80" max="1080" step="10">
+          </div>
+        </div>
+
+        <div class="presets-container">
+          <span class="presets-caption">Пресеты:</span>
+          <div class="chips-group">
+            <button type="button" class="chip-btn" data-w="550" data-h="130">550×130</button>
+            <button type="button" class="chip-btn" data-w="640" data-h="180">640×180</button>
+            <button type="button" class="chip-btn" data-w="800" data-h="220">800×220</button>
+          </div>
+        </div>
+
+        <!-- Переключатели в стиле Twitch -->
+        <div class="toggles-list">
+          <label class="toggle-item">
+            <span class="toggle-label">Закрывать оверлей по Enter</span>
+            <div class="switch">
+              <input type="checkbox" id="closeOnSubmit" checked>
+              <span class="switch-slider"></span>
+            </div>
+          </label>
+
+          <label class="toggle-item">
+            <span class="toggle-label">Очищать поле после отправки</span>
+            <div class="switch">
+              <input type="checkbox" id="clearOnSubmit" checked>
+              <span class="switch-slider"></span>
+            </div>
+          </label>
+
+          <label class="toggle-item">
+            <span class="toggle-label">Закрывать оверлей по Escape</span>
+            <div class="switch">
+              <input type="checkbox" id="closeOnEscape" checked>
+              <span class="switch-slider"></span>
+            </div>
+          </label>
+        </div>
+      </section>
+
+      <!-- Нижняя панель действий -->
+      <footer class="bottom-actions">
+        <button id="btn-save" class="btn btn-primary" type="button">Сохранить</button>
+        <span id="save-indicator" class="save-toast"></span>
+      </footer>
+
+    </main>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="desktop.js"></script>
+</body>
+</html>
