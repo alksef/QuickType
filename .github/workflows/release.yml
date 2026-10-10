@@ -39,10 +39,26 @@ jobs:
           $pattern = "(?s)## \[$ver\][^\r\n]*\r?\n(.*?)(?=\r?\n## \[|\Z)"
           if ($changelog -match $pattern) {
               $notes = $matches[1].Trim()
-              Set-Content -Path "release-notes.md" -Value $notes -Encoding UTF8
           } else {
-              Set-Content -Path "release-notes.md" -Value "QuickType release $ver" -Encoding UTF8
+              $notes = "QuickType release $ver"
           }
+          $body = @"
+### 📦 Установка (требуется Developer Mode)
+
+Клиент Overwolf блокирует неподписанные файлы ``.opk``. Установка производится как распакованное расширение через режим разработчика (**Developer Mode**):
+
+1. Скачайте прикреплённый архив **``QuickType-$ver.zip``** и распакуйте его.
+2. В клиенте Overwolf откройте **Настройки** -> **О программе** (About).
+3. Кликните **10 раз подряд** по номеру версии Overwolf — появится меню **Development Options** (Пакетирование).
+4. Нажмите **Load unpacked extension** и укажите распакованную папку ``quicktype-overlay``.
+
+---
+
+### Изменения в v$ver:
+
+$notes
+"@
+          Set-Content -Path "release-notes.md" -Value $body -Encoding UTF8
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
