@@ -14,7 +14,7 @@
   var switching = false;
   var currentConfig = loadOverlayConfig();
 
-  console.log('[QuickType] Controller initialized v0.2.1');
+  console.log('[QuickType] Controller initialized');
 
   if (typeof overwolf !== 'undefined') {
     // 1. Обработка клика по иконке в доке Overwolf или запуска приложения
@@ -31,6 +31,7 @@
       if (event.name !== HOTKEY_NAME) return;
       if (switching) return;
       switching = true;
+      setTimeout(function () { switching = false; }, 1200);
 
       overwolf.windows.getWindowState(OVERLAY_WINDOW, function (result) {
         if (!result.success) {
@@ -51,14 +52,21 @@
     // 3. Обработка сообщений между окнами
     overwolf.windows.onMessageReceived.addListener(function (message) {
       if (message.id === 'hide_overlay') {
-        if (switching) return;
         switching = true;
         hideOverlay();
       } else if (message.id === 'config_updated') {
         currentConfig = loadOverlayConfig();
         applyConfigToOverlay();
+      } else if (message.id === 'preview_config') {
+        withOverlayWindow(function (id) {
+          overwolf.windows.sendMessage(id, 'preview_config', message.content, function () {});
+        });
+      } else if (message.id === 'reset_bounds') {
+        withOverlayWindow(function (id) {
+          overwolf.windows.sendMessage(id, 'reset_bounds', {}, function () {});
+        });
       } else if (message.id === 'submit_text') {
-        handleSubmitText(message.content ? message.content.text : '');
+        handleSubmitText(message.content || {});
       }
     });
   }
@@ -86,25 +94,17 @@
 
   function applyConfigToOverlay() {
     withOverlayWindow(function (id) {
-      var w = currentConfig.overlayWidth || 640;
-      var h = currentConfig.overlayHeight || 180;
-      overwolf.windows.changeSize(id, w, h, function (res) {
-        console.log('[QuickType] changeSize result:', res);
-      });
       overwolf.windows.sendMessage(id, 'config_updated', currentConfig, function () {});
     });
   }
 
   function focusInputField(id) {
     overwolf.windows.sendMessage(id, 'focus_input_field', {}, function () {});
-    setTimeout(function () {
-      overwolf.windows.sendMessage(id, 'focus_input_field', {}, function () {});
-    }, 40);
   }
 
   function showOverlay() {
     withOverlayWindow(function (id) {
-      // Восстанавливаем окно без блокирующих промежуточных вызовов
+      // Восстанавливаем окно
       overwolf.windows.restore(id, function (restoreResult) {
         if (!restoreResult.success) {
           switching = false;
@@ -112,20 +112,31 @@
           return;
         }
 
-        // Вызов bringToFront для перевода окна на передний план
-        if (typeof overwolf.windows.bringToFront === 'function') {
-          overwolf.windows.bringToFront(id, true, function () {});
-        }
+        var focusTriggered = false;
+        function triggerOverlayFocus() {
+          if (focusTriggered) return;
+          focusTriggered = true;
 
-        // Запрос эксклюзивного фокуса
-        if (typeof overwolf.windows.requestOverlayFocus === 'function') {
-          overwolf.windows.requestOverlayFocus(id, function (focusResult) {
+          if (typeof overwolf.windows.requestOverlayFocus === 'function') {
+            overwolf.windows.requestOverlayFocus(id, function (focusResult) {
+              switching = false;
+              focusInputField(id);
+            });
+          } else {
             switching = false;
             focusInputField(id);
+          }
+        }
+
+        // Переводим окно на передний план с захватом системного фокуса
+        if (typeof overwolf.windows.bringToFront === 'function') {
+          overwolf.windows.bringToFront(id, true, function () {
+            triggerOverlayFocus();
           });
+          // Страховочный вызов фокуса на случай задержки колбэка от Overwolf
+          setTimeout(triggerOverlayFocus, 60);
         } else {
-          switching = false;
-          focusInputField(id);
+          triggerOverlayFocus();
         }
       });
     });
@@ -133,6 +144,7 @@
 
   function hideOverlay() {
     withOverlayWindow(function (id) {
+      overwolf.windows.sendMessage(id, 'overlay_hidden', {}, function () {});
       overwolf.windows.minimize(id, function (result) {
         switching = false;
       });
@@ -140,9 +152,10 @@
   }
 
   // Асинхронное выполнение REST API запроса
-  function handleSubmitText(text) {
-    if (!text) return;
-    console.log('[QuickType] Отправка REST запроса для текста:', text);
+  function handleSubmitText(submission) {
+    var text = submission.text;
+    if (!text || !submission.requestId) return;
+    currentConfig = loadOverlayConfig();
 
     executeRestRequest(currentConfig, text)
       .then(function (result) {
@@ -151,13 +164,13 @@
         }
         console.log('[QuickType] REST запрос выполнен успешно:', result.status, result.durationMs + 'ms');
         withOverlayWindow(function (id) {
-          overwolf.windows.sendMessage(id, 'rest_result', { ok: true, status: result.status }, function () {});
+          overwolf.windows.sendMessage(id, 'rest_result', { ok: true, status: result.status, requestId: submission.requestId }, function () {});
         });
       })
       .catch(function (error) {
         console.error('[QuickType] Ошибка REST запроса:', error.message);
         withOverlayWindow(function (id) {
-          overwolf.windows.sendMessage(id, 'rest_result', { ok: false, error: error.message }, function () {});
+          overwolf.windows.sendMessage(id, 'rest_result', { ok: false, error: error.message, requestId: submission.requestId }, function () {});
         });
       });
   }

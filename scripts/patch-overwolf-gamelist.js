@@ -1,79 +1,82 @@
-/**
- * Utility script to patch an Overwolf game entry in GamesList.*.xml
- * to enforce Exclusive Mode and disable SmartMixMode.
- * 
- * Usage:
- *   node scripts/patch-overwolf-gamelist.js [gameId]
- * Default gameId: 221561 (Cult of the Lamb)
- */
-
+/** Patch a local Overwolf GamesList cache. Run explicitly with Overwolf closed. */
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
-const targetGameId = process.argv[2] || '221561';
-const appData = process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE, 'AppData', 'Local');
-const overwolfDir = path.join(appData, 'Overwolf');
+const parseXmlScript = `
+$ErrorActionPreference = 'Stop'
+[Console]::InputEncoding = New-Object System.Text.UTF8Encoding($false)
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
+$settings = New-Object System.Xml.XmlReaderSettings
+$settings.DtdProcessing = [System.Xml.DtdProcessing]::Prohibit
+$settings.XmlResolver = $null
+$reader = [System.Xml.XmlReader]::Create((New-Object System.IO.StringReader([Console]::In.ReadToEnd())), $settings)
+$doc = New-Object System.Xml.XmlDocument
+$doc.PreserveWhitespace = $true
+$doc.XmlResolver = $null
+try { $doc.Load($reader) } finally { $reader.Dispose() }
+`;
 
-if (!fs.existsSync(overwolfDir)) {
-  console.error('[patch-gamelist] Overwolf directory not found at:', overwolfDir);
-  process.exit(1);
+function runXmlScript(content, script) {
+  return execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', parseXmlScript + script],
+    { input: content, encoding: 'utf8', windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] }).trim();
 }
 
-// Find all GamesList.*.xml files (ignoring .bak)
-const files = fs.readdirSync(overwolfDir).filter(f => /^GamesList\.\d+\.xml$/i.test(f));
-
-if (files.length === 0) {
-  console.error('[patch-gamelist] No GamesList.*.xml files found in Overwolf folder.');
-  process.exit(1);
+function validateXml(content) {
+  runXmlScript(content, '');
 }
 
-for (const file of files) {
-  const fullPath = path.join(overwolfDir, file);
-  console.log(`[patch-gamelist] Inspecting ${file}...`);
-  let content = fs.readFileSync(fullPath, 'utf8');
-
-  const idTag = `<ID>${targetGameId}</ID>`;
-  const idx = content.indexOf(idTag);
-  if (idx === -1) {
-    console.log(`[patch-gamelist] Game ID ${targetGameId} not found in ${file}.`);
-    continue;
+function patchGameList(content, gameId) {
+  if (!/^\d+$/.test(gameId)) throw new Error('Game ID must contain only digits');
+  const result = JSON.parse(runXmlScript(content, `
+if ($doc.DocumentElement.NamespaceURI -ne '') { throw 'Unsupported GamesList XML namespace' }
+$games = @($doc.SelectNodes('//GameInfo') | Where-Object { $_.SelectSingleNode('ID') -and $_.SelectSingleNode('ID').InnerText.Trim() -eq '${gameId}' })
+if ($games.Count -gt 1) { throw 'Duplicate game ID' }
+$changed = $false
+if ($games.Count -eq 1) {
+  $desired = [ordered]@{ ControlModes = 'NotAllowMixedMode'; Client_GameControlMode = 'MixedNotAvailable'; DisableSmartMixMode = 'True' }
+  foreach ($tag in $desired.Keys) {
+    $nodes = $games[0].SelectNodes($tag)
+    if ($nodes.Count -gt 1) { throw ('Duplicate configuration tag: ' + $tag) }
+    if ($nodes.Count -eq 0) {
+      $node = $doc.CreateElement($tag)
+      [void]$games[0].AppendChild($node)
+      $changed = $true
+    } else { $node = $nodes[0] }
+    if ($node.InnerText -ne $desired[$tag]) { $node.InnerText = $desired[$tag]; $changed = $true }
   }
-
-  const endTag = '</GameInfo>';
-  const blockEnd = content.indexOf(endTag, idx);
-  if (blockEnd === -1) {
-    console.error(`[patch-gamelist] Malformed XML: could not find ${endTag} after ${idTag}`);
-    continue;
-  }
-
-  const block = content.slice(idx, blockEnd);
-  const patches = [];
-  if (!block.includes('<ControlModes>')) {
-    patches.push('    <ControlModes>NotAllowMixedMode</ControlModes>');
-  }
-  if (!block.includes('<Client_GameControlMode>')) {
-    patches.push('    <Client_GameControlMode>MixedNotAvailable</Client_GameControlMode>');
-  }
-  if (!block.includes('<DisableSmartMixMode>')) {
-    patches.push('    <DisableSmartMixMode>True</DisableSmartMixMode>');
-  }
-
-  if (patches.length === 0) {
-    console.log(`[patch-gamelist] Game ${targetGameId} is already fully patched in ${file}.`);
-    continue;
-  }
-
-  // Create backup if not exists
-  const bakPath = fullPath + '.bak';
-  if (!fs.existsSync(bakPath)) {
-    fs.copyFileSync(fullPath, bakPath);
-    console.log(`[patch-gamelist] Created backup at ${bakPath}`);
-  }
-
-  const insertion = '\n' + patches.join('\n') + '\n  ';
-  const updatedContent = content.slice(0, blockEnd) + insertion + content.slice(blockEnd);
-  fs.writeFileSync(fullPath, updatedContent, 'utf8');
-  console.log(`[patch-gamelist] Successfully applied ${patches.length} patch(es) to ${file} for Game ${targetGameId}.`);
+}
+@{ found = ($games.Count -eq 1); changed = $changed; content = $doc.OuterXml } | ConvertTo-Json -Compress
+`));
+  if (!result.changed) result.content = content;
+  return result;
 }
 
-console.log('[patch-gamelist] Done.');
+function main() {
+  const gameId = process.argv[2] || '221561';
+  if (!/^\d+$/.test(gameId)) throw new Error('Game ID must contain only digits');
+  const appData = process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE, 'AppData', 'Local');
+  const directory = path.join(appData, 'Overwolf');
+  const files = fs.readdirSync(directory).filter(file => /^GamesList\.\d+\.xml$/i.test(file));
+  if (!files.length) throw new Error('No GamesList.*.xml files found in ' + directory);
+  let found = false;
+  for (const file of files) {
+    const fullPath = path.join(directory, file);
+    const content = fs.readFileSync(fullPath, 'utf8');
+    validateXml(content);
+    const result = patchGameList(content, gameId);
+    found = found || result.found;
+    if (!result.found) { console.log('[patch-gamelist] Game not found in ' + file); continue; }
+    if (!result.changed) { console.log('[patch-gamelist] Already patched: ' + file); continue; }
+    validateXml(result.content);
+    if (!fs.existsSync(fullPath + '.bak')) fs.copyFileSync(fullPath, fullPath + '.bak');
+    fs.writeFileSync(fullPath, result.content, 'utf8');
+    console.log('[patch-gamelist] Patched ' + file + '; original backup: ' + fullPath + '.bak');
+  }
+  if (!found) throw new Error('Game ID ' + gameId + ' was not found');
+}
+
+if (require.main === module) {
+  try { main(); } catch (error) { console.error('[patch-gamelist] ' + error.message); process.exitCode = 1; }
+}
+module.exports = { patchGameList, validateXml };
