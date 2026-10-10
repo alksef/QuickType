@@ -32,6 +32,68 @@ body::-webkit-scrollbar-thumb:hover {
   background: #3f3f4e;
 }
 
+/* Custom Window Titlebar */
+.window-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 32px;
+  background: #0e0e12;
+  border-bottom: 1px solid #23232e;
+  padding: 0 0 0 14px;
+  user-select: none;
+  -webkit-app-region: drag;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  flex-shrink: 0;
+}
+
+.window-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #adadb8;
+}
+
+.window-icon {
+  width: 14px;
+  height: 14px;
+  color: #9146ff;
+}
+
+.window-controls {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+
+.window-control-btn {
+  width: 44px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: #adadb8;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.window-control-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.window-control-btn.close:hover {
+  background: #e81123;
+  color: #ffffff;
+}
+
 /* Fixed Container */
 .main-container {
   width: 100%;
@@ -314,6 +376,31 @@ body::-webkit-scrollbar-thumb:hover {
   color: #848494;
 }
 
+.result-box-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-close-result {
+  background: transparent;
+  border: none;
+  color: #848494;
+  cursor: pointer;
+  padding: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  line-height: 1;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.btn-close-result:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .result-box-body {
   font-size: 11px;
   line-height: 1.45;
@@ -325,11 +412,125 @@ body::-webkit-scrollbar-thumb:hover {
   user-select: text;
 }
 
-/* Overlay Size Grid */
-.size-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+/* Appearance Controls */
+.range-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.form-range {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  background: #23232e;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.form-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #9146ff;
+  border: 2px solid #ffffff;
+  cursor: pointer;
+  transition: transform 0.15s, background-color 0.15s;
+}
+
+.form-range::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  background: #a970ff;
+}
+
+.color-control-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
   gap: 12px;
+  margin-top: 4px;
+}
+
+.theme-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.color-picker-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.color-picker-input {
+  -webkit-appearance: none;
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  padding: 2px;
+  cursor: pointer;
+  background: #1e1e28;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.15s;
+}
+
+.color-picker-input:hover {
+  border-color: #9146ff;
+  box-shadow: 0 0 0 2px rgba(145, 70, 255, 0.35), 0 3px 8px rgba(0, 0, 0, 0.6);
+  transform: translateY(-1px);
+}
+
+.color-picker-input:focus-visible {
+  outline: none;
+  border-color: #9146ff;
+  box-shadow: 0 0 0 2px rgba(145, 70, 255, 0.5);
+}
+
+.color-picker-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+  border-radius: 5px;
+}
+
+.color-picker-input::-webkit-color-swatch {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
+  box-shadow: inset 0 0 3px rgba(0, 0, 0, 0.5);
+}
+
+.reset-bounds-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #171720;
+  border: 1px dashed #2e2e3e;
+  border-radius: 8px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+.reset-bounds-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.reset-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #dedee3;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 11px;
 }
 
 /* Presets Chips */

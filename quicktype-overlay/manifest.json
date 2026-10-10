@@ -5,7 +5,7 @@
     "name": "QuickType",
     "author": "QuickType",
     "version": "0.2.3",
-    "minimum-overwolf-version": "0.188.0",
+    "minimum-overwolf-version": "0.250.0",
     "description": "Universal in-game quick input overlay with REST API & webhook integration.",
     "dock_button_title": "QuickType",
     "icon": "icon.png",
@@ -38,6 +38,7 @@
       },
       "desktop": {
         "file": "desktop.html",
+        "desktop_only": true,
         "native_window": true,
         "resizable": false,
         "transparent": false,
@@ -58,7 +59,7 @@
       "overlay": {
         "file": "overlay.html",
         "transparent": true,
-        "resizable": false,
+        "resizable": true,
         "show_in_taskbar": false,
         "in_game_only": true,
         "grab_keyboard_focus": true,
@@ -69,8 +70,12 @@
           "height": 180
         },
         "min_size": {
-          "width": 300,
-          "height": 80
+          "width": 240,
+          "height": 60
+        },
+        "max_size": {
+          "width": 1920,
+          "height": 1080
         }
       }
     },

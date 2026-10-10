@@ -6,8 +6,29 @@
   <link rel="stylesheet" href="desktop.css">
 </head>
 <body>
+  <!-- Системный заголовок окна с кнопками управления -->
+  <div class="window-titlebar" id="windowTitlebar">
+    <div class="window-title">
+      <svg class="window-icon" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M4 3h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-4l-4 4-4-4H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm1 2v10h4l3 3 3-3h4V5H5z"/>
+      </svg>
+      <span>QuickType — Настройки</span>
+    </div>
+    <div class="window-controls">
+      <button type="button" class="window-control-btn" id="btnWindowMinimize" title="Свернуть" aria-label="Свернуть">
+        <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor">
+          <path d="M2 8a.75.75 0 0 1 .75-.75h10.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 8z"/>
+        </svg>
+      </button>
+      <button type="button" class="window-control-btn close" id="btnWindowClose" title="Закрыть" aria-label="Закрыть">
+        <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor">
+          <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
   <div class="main-container">
-    <!-- Верхний лаконичный заголовок приложения (без дублирования кнопок окна) -->
     <header class="app-hero">
       <div class="brand-badge">
         <svg class="brand-icon" viewBox="0 0 24 24" fill="currentColor">
@@ -82,7 +103,14 @@
         <div id="testResultBox" class="test-result-box" style="display: none;">
           <div class="result-box-header">
             <span id="resultBoxTitle" class="result-box-title">Результат</span>
-            <span id="resultBoxMeta" class="result-box-meta"></span>
+            <div class="result-box-actions">
+              <span id="resultBoxMeta" class="result-box-meta"></span>
+              <button type="button" id="btn-close-result" class="btn-close-result" title="Закрыть ответ" aria-label="Закрыть ответ">
+                <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor">
+                  <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.749.749 0 0 1 1.275.326.749.749 0 0 1-.215.734L9.06 8l3.22 3.22a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L8 9.06l-3.22 3.22a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06z"/>
+                </svg>
+              </button>
+            </div>
           </div>
           <pre id="resultBoxBody" class="result-box-body code-font"></pre>
         </div>
@@ -90,37 +118,60 @@
 
       <hr class="section-divider">
 
-      <!-- СЕКЦИЯ 3: Окно оверлея -->
+      <!-- СЕКЦИЯ 3: Внешний вид оверлея -->
       <section class="settings-section">
         <div class="section-header">
           <span class="header-indicator cyan"></span>
-          <h2 class="section-title">Окно оверлея</h2>
+          <h2 class="section-title">Внешний вид оверлея</h2>
         </div>
 
-        <div class="size-grid">
-          <div class="form-group">
-            <label for="overlayWidth">Ширина (px)</label>
-            <input type="number" id="overlayWidth" class="form-input" min="300" max="1920" step="20">
+        <!-- 1. Прозрачность фона -->
+        <div class="form-group">
+          <div class="range-header">
+            <label for="overlayOpacity">Прозрачность окна</label>
+            <span id="opacityValue" class="badge">90%</span>
           </div>
-          <div class="form-group">
-            <label for="overlayHeight">Высота (px)</label>
-            <input type="number" id="overlayHeight" class="form-input" min="80" max="1080" step="10">
+          <input type="range" id="overlayOpacity" class="form-range" min="20" max="100" step="5" value="90">
+          <span class="field-hint">Регулирует полупрозрачность фона оверлея поверх игры</span>
+        </div>
+
+        <!-- 2. Тема и цвет фона -->
+        <div class="form-group">
+          <label>Цвет фона и пресеты</label>
+          <div class="color-control-row">
+            <div class="color-picker-wrap">
+              <input type="color" id="overlayBgColor" class="color-picker-input" value="#0e0e12" title="Выбрать свой цвет фона">
+            </div>
+            <div class="chips-group theme-chips">
+              <button type="button" class="chip-btn theme-chip" data-color="#0e0e12" data-opacity="90">Тёмный</button>
+              <button type="button" class="chip-btn theme-chip" data-color="#050508" data-opacity="95">OLED</button>
+              <button type="button" class="chip-btn theme-chip" data-color="#141424" data-opacity="75">Стекло</button>
+              <button type="button" class="chip-btn theme-chip" data-color="#2a2a38" data-opacity="90">Светло-серый</button>
+            </div>
           </div>
         </div>
 
-        <div class="presets-container">
-          <span class="presets-caption">Пресеты:</span>
-          <div class="chips-group">
-            <button type="button" class="chip-btn" data-w="550" data-h="130">550×130</button>
-            <button type="button" class="chip-btn" data-w="640" data-h="180">640×180</button>
-            <button type="button" class="chip-btn" data-w="800" data-h="220">800×220</button>
+        <!-- 3. Свободный Drag & Resize и сброс -->
+        <div class="reset-bounds-box">
+          <div class="reset-bounds-text">
+            <span class="reset-title">Положение и размер</span>
+            <span class="field-hint">Окно можно свободно двигать за верх и растягивать за угол в игре.</span>
           </div>
+          <button type="button" id="btn-reset-bounds" class="btn btn-ghost btn-sm">Сбросить окно</button>
         </div>
 
-        <!-- Переключатели в стиле Twitch -->
+        <!-- Переключатели параметров -->
         <div class="toggles-list">
           <label class="toggle-item">
-            <span class="toggle-label">Закрывать оверлей по Enter</span>
+            <span class="toggle-label">Показывать подсказки клавиш (Enter / Shift+Enter / Esc)</span>
+            <div class="switch">
+              <input type="checkbox" id="showHints" checked>
+              <span class="switch-slider"></span>
+            </div>
+          </label>
+
+          <label class="toggle-item">
+            <span class="toggle-label">Закрывать оверлей при успешной отправке</span>
             <div class="switch">
               <input type="checkbox" id="closeOnSubmit" checked>
               <span class="switch-slider"></span>
@@ -128,7 +179,7 @@
           </label>
 
           <label class="toggle-item">
-            <span class="toggle-label">Очищать поле после отправки</span>
+            <span class="toggle-label">Очищать поле после успешной отправки</span>
             <div class="switch">
               <input type="checkbox" id="clearOnSubmit" checked>
               <span class="switch-slider"></span>

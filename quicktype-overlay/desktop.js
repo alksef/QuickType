@@ -4,8 +4,13 @@ document.addEventListener('DOMContentLoaded', function () {
   var httpMethodSelect = document.getElementById('httpMethod');
   var headersTextarea = document.getElementById('headers');
   var payloadTemplateTextarea = document.getElementById('payloadTemplate');
-  var overlayWidthInput = document.getElementById('overlayWidth');
-  var overlayHeightInput = document.getElementById('overlayHeight');
+  // Элементы внешнего вида оверлея
+  var overlayOpacityInput = document.getElementById('overlayOpacity');
+  var opacityValueSpan = document.getElementById('opacityValue');
+  var overlayBgColorInput = document.getElementById('overlayBgColor');
+  var showHintsCheckbox = document.getElementById('showHints');
+  var btnResetBounds = document.getElementById('btn-reset-bounds');
+
   var closeOnSubmitCheckbox = document.getElementById('closeOnSubmit');
   var clearOnSubmitCheckbox = document.getElementById('clearOnSubmit');
   var closeOnEscapeCheckbox = document.getElementById('closeOnEscape');
@@ -20,28 +25,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var resultBoxTitle = document.getElementById('resultBoxTitle');
   var resultBoxMeta = document.getElementById('resultBoxMeta');
   var resultBoxBody = document.getElementById('resultBoxBody');
-
-  // Управление окном Overwolf (если присутствуют кастомные кнопки)
-  var btnMinimize = document.getElementById('btn-minimize');
-  var btnClose = document.getElementById('btn-close');
-
-  if (typeof overwolf !== 'undefined') {
-    if (btnMinimize) {
-      btnMinimize.addEventListener('click', function () {
-        overwolf.windows.getCurrentWindow(function (res) {
-          if (res.success) overwolf.windows.minimize(res.window.id);
-        });
-      });
-    }
-
-    if (btnClose) {
-      btnClose.addEventListener('click', function () {
-        overwolf.windows.getCurrentWindow(function (res) {
-          if (res.success) overwolf.windows.close(res.window.id);
-        });
-      });
-    }
-  }
+  var btnCloseResult = document.getElementById('btn-close-result');
 
   // Загружаем текущий конфиг
   var currentConfig = loadOverlayConfig();
@@ -52,8 +36,14 @@ document.addEventListener('DOMContentLoaded', function () {
     httpMethodSelect.value = (cfg.httpMethod || 'POST').toUpperCase();
     headersTextarea.value = cfg.headers || '';
     payloadTemplateTextarea.value = cfg.payloadTemplate || '';
-    overlayWidthInput.value = cfg.overlayWidth || 640;
-    overlayHeightInput.value = cfg.overlayHeight || 180;
+    
+    var opVal = cfg.overlayOpacity != null ? cfg.overlayOpacity : 90;
+    overlayOpacityInput.value = opVal;
+    if (opacityValueSpan) opacityValueSpan.textContent = opVal + '%';
+
+    overlayBgColorInput.value = cfg.overlayBgColor || '#0e0e12';
+    showHintsCheckbox.checked = cfg.showHints !== false;
+
     closeOnSubmitCheckbox.checked = cfg.closeOnSubmit !== false;
     clearOnSubmitCheckbox.checked = cfg.clearOnSubmit !== false;
     closeOnEscapeCheckbox.checked = cfg.closeOnEscape !== false;
@@ -65,21 +55,69 @@ document.addEventListener('DOMContentLoaded', function () {
       httpMethod: httpMethodSelect.value,
       headers: headersTextarea.value.trim(),
       payloadTemplate: payloadTemplateTextarea.value.trim(),
-      overlayWidth: parseInt(overlayWidthInput.value, 10) || 640,
-      overlayHeight: parseInt(overlayHeightInput.value, 10) || 180,
+      overlayOpacity: parseInt(overlayOpacityInput.value, 10) || 90,
+      overlayBgColor: overlayBgColorInput.value || '#0e0e12',
+      showHints: showHintsCheckbox.checked,
       closeOnSubmit: closeOnSubmitCheckbox.checked,
       clearOnSubmit: clearOnSubmitCheckbox.checked,
       closeOnEscape: closeOnEscapeCheckbox.checked
     };
   }
 
-  // Пресеты размеров
-  document.querySelectorAll('.chip-btn').forEach(function (btn) {
+  function emitLiveConfig() {
+    var cfg = readForm();
+    currentConfig = Object.assign({}, currentConfig, cfg);
+    if (typeof overwolf !== 'undefined') {
+      overwolf.windows.sendMessage('background', 'preview_config', {
+        overlayOpacity: cfg.overlayOpacity, overlayBgColor: cfg.overlayBgColor, showHints: cfg.showHints
+      }, function () {});
+    }
+  }
+
+  // Интерактивное обновление ползунка прозрачности
+  overlayOpacityInput.addEventListener('input', function () {
+    if (opacityValueSpan) opacityValueSpan.textContent = overlayOpacityInput.value + '%';
+    emitLiveConfig();
+  });
+
+  // Интерактивное обновление цвета фона
+  overlayBgColorInput.addEventListener('input', function () {
+    emitLiveConfig();
+  });
+
+  // Пресеты тем
+  document.querySelectorAll('.theme-chip').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      overlayWidthInput.value = btn.getAttribute('data-w');
-      overlayHeightInput.value = btn.getAttribute('data-h');
+      var col = btn.getAttribute('data-color');
+      var op = btn.getAttribute('data-opacity');
+      if (col) overlayBgColorInput.value = col;
+      if (op) {
+        overlayOpacityInput.value = op;
+        if (opacityValueSpan) opacityValueSpan.textContent = op + '%';
+      }
+      emitLiveConfig();
     });
   });
+
+  // Тумблер подсказок
+  showHintsCheckbox.addEventListener('change', function () {
+    emitLiveConfig();
+  });
+
+  // Кнопка сброса положения и размера окна
+  if (btnResetBounds) {
+    btnResetBounds.addEventListener('click', function () {
+      currentConfig.overlayBounds = null;
+      currentConfig.overlayWidth = 640;
+      currentConfig.overlayHeight = 180;
+      updateOverlayConfig({ overlayBounds: null, overlayWidth: 640, overlayHeight: 180 });
+
+      if (typeof overwolf !== 'undefined') {
+        overwolf.windows.sendMessage('background', 'reset_bounds', {}, function () {});
+      }
+      showStatus('Положение окна сброшено (640×180 по умолчанию)', true);
+    });
+  }
 
   // Сохранение настроек
   document.getElementById('btn-save').addEventListener('click', function () {
@@ -87,18 +125,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (cfg.headers) {
       try {
-        JSON.parse(cfg.headers);
+        parseRequestHeaders(cfg.headers);
       } catch (e) {
         showStatus('Ошибка в JSON заголовков: ' + e.message, false);
         return;
       }
     }
 
-    var success = saveOverlayConfig(cfg);
+    currentConfig = Object.assign({}, loadOverlayConfig(), cfg);
+    var success = updateOverlayConfig(cfg);
     if (success) {
       showStatus('Сохранено!', true);
       if (typeof overwolf !== 'undefined') {
-        overwolf.windows.sendMessage('background', 'config_updated', cfg, function () {});
+        overwolf.windows.sendMessage('background', 'config_updated', currentConfig, function () {});
       }
     } else {
       showStatus('Ошибка сохранения', false);
@@ -125,6 +164,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Тест REST-запроса
   async function performTest() {
+    if (btnTestRequest.disabled) return;
     var cfg = readForm();
     var text = testInput.value.trim();
 
@@ -200,5 +240,62 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   });
 
+  if (btnCloseResult) {
+    btnCloseResult.addEventListener('click', function () {
+      if (testResultBox) testResultBox.style.display = 'none';
+      if (resultBadge) {
+        resultBadge.textContent = 'Готов к тесту';
+        resultBadge.className = 'badge';
+      }
+      if (resultStatusText) {
+        resultStatusText.textContent = '';
+        resultStatusText.className = 'status-detail';
+      }
+    });
+  }
 
+  // Управление окном настроек (Minimize / Close / Drag)
+  var btnWindowMinimize = document.getElementById('btnWindowMinimize');
+  var btnWindowClose = document.getElementById('btnWindowClose');
+  var windowTitlebar = document.getElementById('windowTitlebar');
+
+  if (btnWindowMinimize) {
+    btnWindowMinimize.addEventListener('click', function () {
+      if (typeof overwolf !== 'undefined' && overwolf.windows) {
+        overwolf.windows.getCurrentWindow(function (res) {
+          if (res && res.success) {
+            overwolf.windows.minimize(res.window.id, function () {});
+          }
+        });
+      }
+    });
+  }
+
+  if (btnWindowClose) {
+    btnWindowClose.addEventListener('click', function () {
+      if (typeof overwolf !== 'undefined' && overwolf.windows) {
+        overwolf.windows.getCurrentWindow(function (res) {
+          if (res && res.success) {
+            overwolf.windows.close(res.window.id, function () {});
+          }
+        });
+      } else {
+        window.close();
+      }
+    });
+  }
+
+  if (windowTitlebar) {
+    windowTitlebar.addEventListener('mousedown', function (e) {
+      if (e.target && e.target.closest && e.target.closest('.window-control-btn')) return;
+      if (e.button !== 0) return;
+      if (typeof overwolf !== 'undefined' && overwolf.windows) {
+        overwolf.windows.getCurrentWindow(function (res) {
+          if (res && res.success) {
+            overwolf.windows.dragMove(res.window.id, function () {});
+          }
+        });
+      }
+    });
+  }
 });
