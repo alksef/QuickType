@@ -1,19 +1,85 @@
 document.addEventListener('DOMContentLoaded', function () {
   var inputField = document.getElementById('inputText');
-  var statusBadge = document.getElementById('hudStatus');
+  var hudContainer = document.getElementById('hudContainer');
   var hudDrag = document.getElementById('hudDrag');
+  var hudResizeGrip = document.getElementById('hudResizeGrip');
+  var hudStatusBanner = document.getElementById('hudStatusBanner');
+  var hudFooter = document.getElementById('hudFooter');
 
   var config = loadOverlayConfig();
-  var windowActivatedTime = 0;
-  var focusTimers = [];
+  var isSubmitting = false;
+  var activeRequest = null;
+  var requestSequence = 0;
+  var requestPrefix = Date.now().toString(36) + Math.random().toString(36).slice(2);
+  var overlayVisible = true;
+  var previewConfig = {};
+  var statusTimeout = null;
+  var saveBoundsTimer = null;
 
-  function setStatus(text, type) {
-    statusBadge.textContent = text;
-    statusBadge.className = 'hud-status ' + (type || '');
+  function hexToRgba(hex, opacityPercent) {
+    if (!hex) hex = '#0e0e12';
+    var clean = hex.replace('#', '');
+    if (clean.length === 3) {
+      clean = clean.split('').map(function (c) { return c + c; }).join('');
+    }
+    var num = parseInt(clean, 16);
+    var r = (num >> 16) & 255;
+    var g = (num >> 8) & 255;
+    var b = num & 255;
+    var alpha = Math.max(0.15, Math.min(1.0, (opacityPercent != null ? opacityPercent : 90) / 100));
+    return 'rgba(' + r + ', ' + g + ', ' + b + ', ' + alpha + ')';
+  }
+
+  function applyConfig(cfg) {
+    config = Object.assign({}, cfg || loadOverlayConfig(), previewConfig);
+
+    // 1. Применяем фон и прозрачность к контейнеру
+    var rgba = hexToRgba(config.overlayBgColor, config.overlayOpacity);
+    if (hudContainer) {
+      hudContainer.style.setProperty('--hud-bg', rgba);
+    }
+
+    // 2. Управление видимостью подсказок
+    if (hudFooter) {
+      if (config.showHints === false) {
+        hudFooter.classList.add('hidden');
+      } else {
+        hudFooter.classList.remove('hidden');
+      }
+    }
+  }
+
+  function setStatus(type, text) {
+    if (statusTimeout) {
+      clearTimeout(statusTimeout);
+      statusTimeout = null;
+    }
+
+    if (!hudContainer || !hudStatusBanner) return;
+
+    if (type !== 'error') {
+      hudStatusBanner.style.display = 'none';
+      hudStatusBanner.textContent = '';
+      hudStatusBanner.className = 'hud-status-banner';
+      return;
+    }
+
+    // Отображаем исключительно сообщение об ошибке (без цветных подсветок окна)
+    hudStatusBanner.className = 'hud-status-banner error';
+    hudStatusBanner.textContent = text || 'Сбой отправки запроса';
+    hudStatusBanner.style.display = 'flex';
   }
 
   function focusField() {
-    if (!inputField) return;
+    if (!inputField || isSubmitting || !overlayVisible) return;
+    try {
+      window.focus();
+    } catch (_) {}
+    if (typeof overwolf !== 'undefined' && overwolf.windows && typeof overwolf.windows.requestOverlayFocus === 'function') {
+      try {
+        overwolf.windows.requestOverlayFocus('overlay', function () {});
+      } catch (_) {}
+    }
     inputField.focus();
     try {
       var len = inputField.value.length;
@@ -21,117 +87,274 @@ document.addEventListener('DOMContentLoaded', function () {
     } catch (_) {}
   }
 
-  function requestAggressiveFocus() {
-    focusTimers.forEach(clearTimeout);
-    focusTimers = [0, 20, 50, 100, 200, 400].map(function (delay) {
-      return setTimeout(function () {
-        focusField();
-      }, delay);
+  function activateOverlay() {
+    overlayVisible = true;
+    // Repeated focus messages must not reset pending requests or drafts.
+    inputField.readOnly = isSubmitting;
+    focusField();
+    [15, 45, 100, 200].forEach(function (delay) {
+      setTimeout(function () { if (overlayVisible) focusField(); }, delay);
     });
   }
 
-  function onWindowActivated() {
-    windowActivatedTime = Date.now();
-    // Очищаем поле при открытии
-    inputField.value = '';
-    requestAggressiveFocus();
-
-    // Защита от утечки символа хоткея (например, "\"):
-    // Если символ нажатого хоткея всё же попал в поле в первые 150 мс — удаляем его
-    setTimeout(function () {
-      if (Date.now() - windowActivatedTime < 300) {
-        if (inputField.value.length === 1) {
-          inputField.value = '';
-        }
-      }
-    }, 80);
+  function dismissOverlay() {
+    overlayVisible = false;
+    if (activeRequest) clearTimeout(activeRequest.timer);
+    activeRequest = null;
+    isSubmitting = false;
+    inputField.readOnly = false;
+    setStatus('normal');
   }
 
-  // Захват фокуса при открытии
+  function saveCurrentBounds() {
+    if (typeof overwolf === 'undefined' || !overwolf.windows) return;
+    overwolf.windows.getCurrentWindow(function (res) {
+      if (res && res.success && res.window) {
+        var w = res.window;
+        config.overlayBounds = {
+          left: w.left,
+          top: w.top,
+          width: w.width,
+          height: w.height
+        };
+        config.overlayWidth = w.width;
+        config.overlayHeight = w.height;
+        updateOverlayConfig({ overlayBounds: config.overlayBounds,
+          overlayWidth: w.width, overlayHeight: w.height });
+      }
+    });
+  }
+
+  function debouncedSaveBounds() {
+    if (saveBoundsTimer) clearTimeout(saveBoundsTimer);
+    saveBoundsTimer = setTimeout(saveCurrentBounds, 500);
+  }
+
+  // Захват фокуса и обработка IPC сообщений от background
   if (typeof overwolf !== 'undefined') {
     overwolf.windows.onMessageReceived.addListener(function (message) {
       if (message.id === 'focus_input_field') {
-        onWindowActivated();
+        activateOverlay();
       } else if (message.id === 'config_updated') {
-        config = loadOverlayConfig();
+        previewConfig = {};
+        applyConfig(message.content);
+      } else if (message.id === 'preview_config') {
+        var preview = message.content || {};
+        ['overlayOpacity', 'overlayBgColor', 'showHints'].forEach(function (key) {
+          if (Object.prototype.hasOwnProperty.call(preview, key)) previewConfig[key] = preview[key];
+        });
+        applyConfig(loadOverlayConfig());
+      } else if (message.id === 'overlay_hidden') {
+        dismissOverlay();
       } else if (message.id === 'rest_result') {
-        if (message.content && message.content.ok) {
-          setStatus('Отправлено', 'success');
-        } else {
-          setStatus('Ошибка', 'error');
-        }
-        setTimeout(function () {
-          setStatus('Готов', '');
-        }, 3000);
+        handleRestResult(message.content);
+      } else if (message.id === 'reset_bounds') {
+        resetWindowBounds();
       }
     });
 
+    // Обработчик перемещения окна за верхнюю планку
     if (hudDrag) {
-      hudDrag.addEventListener('mousedown', function () {
-        overwolf.windows.getCurrentWindow(function (res) {
-          if (res.success) {
-            overwolf.windows.dragMove(res.window.id);
-          }
+      hudDrag.addEventListener('mousedown', function (e) {
+        startDragMove(e);
+      });
+    }
+
+    // Обработчики масштабирования окна за грани и углы
+    var resizeHandles = [
+      { id: 'hudResizeTop', edge: 'Top' },
+      { id: 'hudResizeBottom', edge: 'Bottom' },
+      { id: 'hudResizeLeft', edge: 'Left' },
+      { id: 'hudResizeRight', edge: 'Right' },
+      { id: 'hudResizeTopLeft', edge: 'TopLeft' },
+      { id: 'hudResizeTopRight', edge: 'TopRight' },
+      { id: 'hudResizeBottomLeft', edge: 'BottomLeft' },
+      { id: 'hudResizeGrip', edge: 'BottomRight' }
+    ];
+    resizeHandles.forEach(function (h) {
+      var el = document.getElementById(h.id);
+      if (el) {
+        el.addEventListener('mousedown', function (e) {
+          startDragResize(h.edge, e);
         });
+      }
+    });
+
+    // Слушаем изменение размеров окна для автосохранения
+    window.addEventListener('resize', debouncedSaveBounds);
+  }
+
+  var currentWindowId = null;
+
+  function cacheCurrentWindowId() {
+    if (typeof overwolf !== 'undefined' && overwolf.windows) {
+      overwolf.windows.getCurrentWindow(function (res) {
+        if (res && res.success && res.window) {
+          currentWindowId = res.window.id;
+        }
       });
     }
   }
 
-  // Дублирование фокуса при системных событиях окна
+  function getDragEdge(edgeName) {
+    if (typeof overwolf !== 'undefined' && overwolf.windows && overwolf.windows.enums && overwolf.windows.enums.WindowDragEdge) {
+      if (overwolf.windows.enums.WindowDragEdge[edgeName] !== undefined) {
+        return overwolf.windows.enums.WindowDragEdge[edgeName];
+      }
+    }
+    return edgeName;
+  }
+
+  function startDragResize(edgeName, e) {
+    if (e && e.button !== 0) return;
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (typeof overwolf === 'undefined' || !overwolf.windows) return;
+    var edge = getDragEdge(edgeName);
+    var doResize = function (winId) {
+      overwolf.windows.dragResize(winId, edge, debouncedSaveBounds);
+    };
+    if (currentWindowId) {
+      doResize(currentWindowId);
+    } else {
+      overwolf.windows.getCurrentWindow(function (res) {
+        if (res && res.success && res.window) {
+          currentWindowId = res.window.id;
+          doResize(currentWindowId);
+        }
+      });
+    }
+  }
+
+  function startDragMove(e) {
+    if (e && e.button !== 0) return;
+    if (e) {
+      e.preventDefault();
+    }
+    if (typeof overwolf === 'undefined' || !overwolf.windows) return;
+    var doMove = function (winId) {
+      overwolf.windows.dragMove(winId, debouncedSaveBounds);
+    };
+    if (currentWindowId) {
+      doMove(currentWindowId);
+    } else {
+      overwolf.windows.getCurrentWindow(function (res) {
+        if (res && res.success && res.window) {
+          currentWindowId = res.window.id;
+          doMove(currentWindowId);
+        }
+      });
+    }
+  }
+
+  function resetWindowBounds() {
+    if (typeof overwolf === 'undefined') return;
+    overwolf.windows.getCurrentWindow(function (res) {
+      if (res.success) {
+        var defaultW = 640;
+        var defaultH = 180;
+        overwolf.windows.changeSize(res.window.id, defaultW, defaultH, function () {
+          overwolf.windows.changePosition(res.window.id, 100, 100, function () {
+            config.overlayBounds = null;
+            config.overlayWidth = defaultW;
+            config.overlayHeight = defaultH;
+            updateOverlayConfig({ overlayBounds: null, overlayWidth: defaultW, overlayHeight: defaultH });
+          });
+        });
+      }
+    });
+  }
+
+  function handleRestResult(content) {
+    if (!content || !activeRequest || content.requestId !== activeRequest.id) return;
+    var completed = activeRequest;
+    clearTimeout(completed.timer);
+    if (content.ok) {
+      if (completed.clear && inputField.value === completed.text) inputField.value = '';
+      statusTimeout = setTimeout(function () {
+        if (activeRequest !== completed) return;
+        setStatus('normal');
+        activeRequest = null;
+        isSubmitting = false;
+        inputField.readOnly = false;
+        if (completed.close && overlayVisible) hideOverlay();
+        else if (overlayVisible) focusField();
+      }, 350);
+    } else {
+      activeRequest = null;
+      isSubmitting = false;
+      inputField.readOnly = false;
+      setStatus('error', content.error || 'Сбой отправки запроса');
+      if (overlayVisible) focusField();
+    }
+  }
+
+  // Restore only valid bounds; Overwolf clamps an in-game window on restore.
+  function restoreSavedBounds() {
+    if (typeof overwolf === 'undefined') return;
+    var bounds = config.overlayBounds;
+    if (!bounds || !['left', 'top', 'width', 'height'].every(function (key) {
+      return typeof bounds[key] === 'number' && isFinite(bounds[key]);
+    })) return;
+    overwolf.windows.getCurrentWindow(function (res) {
+      if (!res.success) return;
+      overwolf.windows.changeSize(res.window.id, Math.max(240, Math.min(1920, bounds.width)),
+        Math.max(60, Math.min(1080, bounds.height)), function (result) {
+          if (result.success) overwolf.windows.changePosition(res.window.id, bounds.left, bounds.top, function () {});
+        });
+    });
+  }
+
+  // Дублирование фокуса при системных событиях
   window.addEventListener('focus', function () {
-    onWindowActivated();
+    if (overlayVisible && !isSubmitting) focusField();
   });
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden) {
-      onWindowActivated();
+    if (overlayVisible && !document.hidden && !isSubmitting) {
+      focusField();
     }
   });
 
-  // Первичная активация фокуса
-  onWindowActivated();
-
-  // Блокируем попадание символа хоткея в первые 120 мс после активации окна
-  inputField.addEventListener('beforeinput', function (event) {
-    if (Date.now() - windowActivatedTime < 120) {
-      event.preventDefault();
-    }
-  });
-
+  // Сброс ошибки при начале редактирования текста
   inputField.addEventListener('input', function () {
-    if (Date.now() - windowActivatedTime < 120) {
-      inputField.value = '';
+    if (hudStatusBanner && hudStatusBanner.style.display !== 'none') {
+      setStatus('normal');
     }
   });
+
+  // Первичная инициализация конфигурации и стилей
+  applyConfig(config);
+  cacheCurrentWindowId();
+  restoreSavedBounds();
+  activateOverlay();
 
   // Обработка клавиатуры
   inputField.addEventListener('keydown', function (event) {
-    // В первые 120 мс блокируем символ хоткея от попадания в поле
-    if (Date.now() - windowActivatedTime < 120) {
-      if (event.key !== 'Escape') {
-        event.preventDefault();
-        event.stopPropagation();
-        return;
-      }
-    }
-
-    // 1. Обработка ESCAPE — отмена и мгновенное скрытие
+    // 1. Обработка ESCAPE — мгновенное скрытие
     if (event.key === 'Escape' || event.code === 'Escape') {
+      if (config.closeOnEscape === false) return;
       event.preventDefault();
       event.stopPropagation();
-      setStatus('Отмена', '');
       hideOverlay();
       return;
     }
 
-    // 2. Обработка ENTER — подтверждение и отправка
+    // 2. Обработка ENTER
     if (event.key === 'Enter' || event.code === 'Enter') {
-      if (event.shiftKey || event.ctrlKey || event.altKey || event.metaKey || 
-          event.isComposing || event.keyCode === 229 || event.repeat) {
+      if (event.shiftKey || event.ctrlKey) {
+        return; // Перенос строки
+      }
+
+      if (event.altKey || event.metaKey || event.isComposing || event.keyCode === 229 || event.repeat) {
         return;
       }
 
       event.preventDefault();
       event.stopPropagation();
+
+      if (isSubmitting) return;
 
       var text = inputField.value.trim();
       if (!text) {
@@ -139,33 +362,42 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
       }
 
-      setStatus('Отправка...', 'sending');
+      // Переводим в состояние ожидания
+      var requestId = requestPrefix + '-' + (++requestSequence);
+      activeRequest = { id: requestId, text: inputField.value,
+        clear: config.clearOnSubmit !== false, close: config.closeOnSubmit !== false };
+      isSubmitting = true;
+      inputField.readOnly = true;
+      setStatus('sending', 'Отправка...');
+      // Also recover if the controller reloads or an IPC reply is lost.
+      activeRequest.timer = setTimeout(function () {
+        handleRestResult({ ok: false, requestId: requestId,
+          error: 'Нет ответа контроллера. Сервер мог принять запрос; проверьте результат перед повтором.' });
+      }, REQUEST_TIMEOUT_MS + 1000);
 
-      // Передаем текст в фоновый контроллер для выполнения REST запроса
       if (typeof overwolf !== 'undefined') {
-        overwolf.windows.sendMessage('background', 'submit_text', { text: text }, function () {});
+        overwolf.windows.sendMessage('background', 'submit_text', { text: text, requestId: requestId }, function (result) {
+          if (result && result.success === false) {
+            handleRestResult({ ok: false, requestId: requestId, error: result.error || 'Не удалось передать запрос контроллеру' });
+          }
+        });
       } else {
+        // Режим локального тестирования без Overwolf
         executeRestRequest(config, text)
           .then(function (res) {
-            setStatus(res.ok ? 'Успех ' + res.status : 'Ошибка ' + res.status, res.ok ? 'success' : 'error');
+            handleRestResult(Object.assign({}, res, { requestId: requestId }));
           })
           .catch(function (err) {
-            setStatus('Сбой: ' + err.message, 'error');
+            handleRestResult({ ok: false, error: err.message, requestId: requestId });
           });
-      }
-
-      if (config.clearOnSubmit !== false) {
-        inputField.value = '';
-      }
-
-      if (config.closeOnSubmit !== false) {
-        hideOverlay();
       }
     }
   });
 
   function hideOverlay() {
+    dismissOverlay();
     if (typeof overwolf !== 'undefined') {
+      debouncedSaveBounds();
       overwolf.windows.sendMessage('background', 'hide_overlay', {}, function () {});
     }
   }

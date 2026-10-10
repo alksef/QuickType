@@ -7,29 +7,38 @@
 </head>
 <body>
   <div class="hud-container" id="hudContainer">
-    <div class="hud-header">
-      <div class="hud-drag" id="hudDrag">
-        <span class="hud-dot"></span>
-        <span class="hud-title">QuickType</span>
-      </div>
-      <div class="hud-status" id="hudStatus">Готов</div>
-    </div>
+    <!-- Грани и углы изменения размера окна (resize handles) -->
+    <div class="hud-resize-edge hud-resize-top" id="hudResizeTop" data-edge="Top"></div>
+    <div class="hud-resize-edge hud-resize-bottom" id="hudResizeBottom" data-edge="Bottom"></div>
+    <div class="hud-resize-edge hud-resize-left" id="hudResizeLeft" data-edge="Left"></div>
+    <div class="hud-resize-edge hud-resize-right" id="hudResizeRight" data-edge="Right"></div>
+    <div class="hud-resize-corner hud-resize-top-left" id="hudResizeTopLeft" data-edge="TopLeft"></div>
+    <div class="hud-resize-corner hud-resize-top-right" id="hudResizeTopRight" data-edge="TopRight"></div>
+    <div class="hud-resize-corner hud-resize-bottom-left" id="hudResizeBottomLeft" data-edge="BottomLeft"></div>
+    <div class="hud-resize-corner hud-resize-bottom-right hud-resize-grip" id="hudResizeGrip" data-edge="BottomRight" title="Потяните для изменения размера"></div>
+
+    <!-- Тонкая элегантная зона перемещения окна вверху -->
+    <div class="hud-drag-strip" id="hudDrag" title="Потяните для перемещения окна"></div>
 
     <div class="input-wrapper">
-      <input 
-        type="text" 
+      <textarea 
         id="inputText" 
         class="hud-input" 
         placeholder="Введите текст или команду..." 
         autocomplete="off" 
         spellcheck="false" 
         autofocus
-      />
+      ></textarea>
     </div>
 
-    <div class="hud-footer">
-      <span class="shortcut-hint"><kbd>Enter</kbd> — Отправить и скрыть</span>
-      <span class="shortcut-hint"><kbd>Esc</kbd> — Отмена</span>
+    <!-- Сообщение об ошибке при отправке -->
+    <div class="hud-status-banner error" id="hudStatusBanner" style="display: none;"></div>
+
+    <!-- Подсказки по клавишам (скрываемые через настройки) -->
+    <div class="hud-footer" id="hudFooter">
+      <span class="shortcut-hint"><kbd>Enter</kbd> — Отправить</span>
+      <span class="shortcut-hint"><kbd>Shift+Enter</kbd> — Перенос</span>
+      <span class="shortcut-hint"><kbd>Esc</kbd> — Закрыть</span>
     </div>
   </div>
 
