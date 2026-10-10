@@ -6,4 +6,4 @@
 
 ## Текущие задачи
 
-- [TASK-001: Реализация двухоконного прототипа REST Overlay](./001-two-window-prototype.md) — `in_progress`
+- [TASK-001: Реализация двухоконного прототипа REST Overlay](./001-two-window-prototype.md) — `completed`
